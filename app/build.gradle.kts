@@ -7,10 +7,22 @@ android {
     compileSdk = 34
     defaultConfig {
         applicationId = "com.ryan.launcher"
-        minSdk = 21
+        minSdk = 23
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
+    }
+    // Fixed signing key so future builds install OVER the old one
+    signingConfigs {
+        create("fixed") {
+            storeFile = file("lite.keystore")
+            storePassword = "litelauncher"
+            keyAlias = "lite"
+            keyPassword = "litelauncher"
+        }
+    }
+    buildTypes {
+        getByName("debug") { signingConfig = signingConfigs.getByName("fixed") }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
