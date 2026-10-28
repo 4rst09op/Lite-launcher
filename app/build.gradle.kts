@@ -10,7 +10,7 @@ android {
         minSdk = 23
         targetSdk = 34
         versionCode = (project.findProperty("vc") as String?)?.toIntOrNull() ?: 2
-        versionName = "3.0"
+        versionName = "4.0"
     }
     // Fixed signing key so future builds install OVER the old one
     signingConfigs {
