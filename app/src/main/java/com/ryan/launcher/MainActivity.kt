@@ -37,24 +37,111 @@ private const val APK = "https://github.com/4rst09op/Lite-launcher/releases/down
 private const val REL = "https://api.github.com/repos/4rst09op/Lite-launcher/releases/tags/latest"
 private const val DEF = "com.google.android.youtube.tv,com.netflix.ninja"
 private val FONTS = listOf(
-    "Poppins Light" to "pop", "Poppins Bold" to "popb", "Bebas Neue" to "bebas", "Audiowide" to "audio",
-    "Pacifico" to "pacifico", "Thin" to "thin", "Light" to "light", "Regular" to "sys",
-    "Condensed" to "cond", "Serif" to "serif"
+    "Poppins Light" to "pop", "Poppins Medium" to "popm", "Poppins SemiBold" to "popb", "Poppins Bold (iPhone tall)" to "popx",
+    "Roboto Black (heavy)" to "black", "Bebas Neue (tall)" to "bebas", "Condensed Bold (tall)" to "condb",
+    "Audiowide (techy)" to "audio", "Pacifico (script)" to "pacifico", "Casual" to "casual", "Handwriting" to "hand",
+    "Thin" to "thin", "Light" to "light", "Medium" to "med", "Regular" to "sys",
+    "Condensed" to "cond", "Condensed Light" to "condl", "Serif" to "serif", "Serif Bold" to "serifb", "Mono" to "mono"
+)
+private val GLASS = listOf(
+    "Frost (soft glass)" to "frost", "Liquid (iOS style)" to "liquid", "Outline only" to "outline", "Neon glow" to "neon",
+    "Chrome (metal)" to "chrome", "Sunset gradient" to "sunset", "Aurora gradient" to "aurora", "Ice" to "ice"
 )
 
-/** Clock text that can render as translucent "glass" (outline + soft gradient fill). */
+/** Clock text with real "glass" looks (frost, liquid, neon, chrome...) and optional tall stretch. */
 class GlassClock(ctx: Context) : TextClock(ctx) {
     var glass = false
+    var gstyle = "frost"
+    var vs = 1f
+
+    override fun onMeasure(w: Int, h: Int) {
+        super.onMeasure(w, h)
+        if (vs != 1f) setMeasuredDimension(measuredWidth, (measuredHeight * vs).toInt())
+    }
+
     override fun onDraw(c: Canvas) {
-        if (!glass) { super.onDraw(c); return }
+        c.save()
+        if (vs != 1f) c.scale(1f, vs)
+        if (!glass) super.onDraw(c) else drawGlass(c)
+        c.restore()
+    }
+
+    private fun plain(c: Canvas) = super.onDraw(c)
+
+    private fun al(col: Int, a: Float) = (col and 0xFFFFFF) or ((a.coerceIn(0f, 1f) * 255).toInt() shl 24)
+
+    private fun drawGlass(c: Canvas) {
         val pt = paint
+        val w = width.toFloat()
+        val th = height / vs
         val base = currentTextColor and 0xFFFFFF
-        pt.style = Paint.Style.STROKE; pt.strokeWidth = max(1.5f, textSize / 36f); pt.shader = null
-        super.onDraw(c)
-        pt.style = Paint.Style.FILL
-        pt.shader = LinearGradient(0f, 0f, 0f, height.toFloat(), base or (0x99000000).toInt(), base or 0x33000000, Shader.TileMode.CLAMP)
-        super.onDraw(c)
-        pt.shader = null
+        val wh = 0xFFFFFF
+        val sw = max(2f, textSize / 34f)
+        fun v(vararg cols: Int) = LinearGradient(0f, 0f, 0f, th, cols, null, Shader.TileMode.CLAMP)
+        fun d(vararg cols: Int) = LinearGradient(0f, 0f, w, th, cols, null, Shader.TileMode.CLAMP)
+        fun solid(col: Int) = LinearGradient(0f, 0f, 1f, 1f, col, col, Shader.TileMode.CLAMP)
+        fun fill(sh: Shader, glowR: Float = 0f, glow: Int = 0) {
+            pt.style = Paint.Style.FILL; pt.shader = sh
+            if (glowR > 0f) pt.setShadowLayer(glowR, 0f, textSize / 45f, glow) else pt.clearShadowLayer()
+            plain(c)
+            pt.clearShadowLayer()
+        }
+        fun line(sh: Shader, width: Float, glowR: Float = 0f, glow: Int = 0) {
+            pt.style = Paint.Style.STROKE; pt.strokeWidth = width; pt.strokeJoin = Paint.Join.ROUND; pt.shader = sh
+            if (glowR > 0f) pt.setShadowLayer(glowR, 0f, 0f, glow) else pt.clearShadowLayer()
+            plain(c)
+            pt.clearShadowLayer()
+        }
+        fun top(frac: Float, sh: Shader) {
+            c.save(); c.clipRect(0f, 0f, w, th * frac)
+            fill(sh)
+            c.restore()
+        }
+        val soft = 0xAA000000.toInt()
+        when (gstyle) {
+            "liquid" -> {
+                fill(v(al(base, .26f), al(base, .07f)), textSize / 9f, soft)
+                top(.38f, v(al(wh, .38f), al(wh, 0f)))
+                line(d(al(wh, 1f), al(wh, .12f), al(wh, .75f)), sw * 1.7f)
+                line(v(al(wh, .0f), al(wh, .55f)), sw * .5f)
+            }
+            "outline" -> {
+                fill(solid(al(base, .06f)))
+                line(solid(al(base, 1f)), sw * 1.5f, textSize / 14f, al(base, .5f))
+            }
+            "neon" -> {
+                fill(solid(al(base, .16f)))
+                line(solid(al(base, 1f)), sw * 2.2f, textSize / 6f, al(base, .95f))
+                line(solid(al(wh, .95f)), sw * .9f)
+            }
+            "chrome" -> {
+                val st = LinearGradient(0f, 0f, 0f, th,
+                    intArrayOf(0xFFFFFFFF.toInt(), 0xFFC9D3E3.toInt(), 0xFF59647A.toInt(), 0xFFB4C0D4.toInt(), 0xFFFFFFFF.toInt()),
+                    floatArrayOf(0f, .44f, .5f, .62f, 1f), Shader.TileMode.CLAMP)
+                fill(st, textSize / 12f, soft)
+                line(solid(al(0x1B2233, .75f)), sw * .8f)
+            }
+            "sunset" -> {
+                fill(v(0xFFFFD27A.toInt(), 0xFFFF6B6B.toInt(), 0xFFB04BD8.toInt()), textSize / 12f, soft)
+                top(.4f, v(al(wh, .30f), al(wh, 0f)))
+                line(solid(al(wh, .55f)), sw * .8f)
+            }
+            "aurora" -> {
+                fill(d(0xFF00F5A0.toInt(), 0xFF00C8F5.toInt(), 0xFF9A5BFF.toInt()), textSize / 12f, soft)
+                top(.4f, v(al(wh, .28f), al(wh, 0f)))
+                line(solid(al(wh, .5f)), sw * .8f)
+            }
+            "ice" -> {
+                fill(v(al(wh, .96f), 0xAA9AD8FF.toInt(), 0x554AA3FF), textSize / 10f, 0xAA2A6CC8.toInt())
+                line(v(al(wh, 1f), al(0xBFE6FF, .55f)), sw)
+            }
+            else -> { // frost
+                fill(v(al(base, .82f), al(base, .26f)), textSize / 9f, soft)
+                top(.42f, v(al(wh, .42f), al(wh, 0f)))
+                line(v(al(wh, 1f), al(base, .35f)), sw)
+            }
+        }
+        pt.style = Paint.Style.FILL; pt.shader = null; pt.strokeWidth = 0f; pt.clearShadowLayer()
     }
 }
 
@@ -68,9 +155,9 @@ class AppItem(val label: String, val pkg: String, val intent: Intent, val icon: 
 private val STR = mapOf("vol" to "40", "tile" to "170", "csize" to "64", "dsize" to "200", "tradius" to "18", "gop" to "18",
     "accent" to "#7FB2FF", "cfont" to "pop", "tfont" to "pop", "cclr" to "#FFFFFF", "tclr" to "#FFFFFF", "wclr" to "#FFFFFF",
     "cpos" to "right", "cstyle" to "normal", "wfit" to "fill", "layout" to "row", "tstyle" to "icon",
-    "wlist" to "", "wcity" to "", "ntext" to "", "cname" to "", "cdate" to "", "wtz" to "")
+    "gstyle" to "frost", "dstretch" to "135", "cy" to "6", "wlist" to "", "wcity" to "", "ntext" to "", "cname" to "", "cdate" to "", "wtz" to "")
 private val TXT = setOf("wlist", "wcity", "ntext", "cname", "cdate", "wtz")
-private val BOOL = listOf("sound", "music", "showdate", "showlabel", "h24", "glass", "auto")
+private val BOOL = listOf("sound", "music", "showdate", "showlabel", "h24", "glass", "auto", "cstack")
 
 class MainActivity : Activity() {
     private lateinit var p: SharedPreferences
@@ -125,7 +212,7 @@ class MainActivity : Activity() {
     private fun on(k: String) = s(k, "1") == "1"
     private fun file(n: String) = File(filesDir, n)
     private fun col(k: String, d: String) = try { Color.parseColor(s(k, d)) } catch (_: Exception) { Color.WHITE }
-    private fun flag(k: String) = s(k, if (k == "h24" || k == "glass" || k == "auto") "0" else "1") == "1"
+    private fun flag(k: String) = s(k, if (k == "h24" || k == "glass" || k == "auto" || k == "cstack") "0" else "1") == "1"
     private fun mix(a: Int, b: Int, t: Float) = Color.rgb(
         (Color.red(a) * (1 - t) + Color.red(b) * t).toInt(),
         (Color.green(a) * (1 - t) + Color.green(b) * t).toInt(),
@@ -139,6 +226,16 @@ class MainActivity : Activity() {
         try {
             when (id) {
                 "pop" -> Typeface.createFromAsset(assets, "fonts/Poppins-Light.ttf")
+                "popm" -> Typeface.createFromAsset(assets, "fonts/Poppins-Medium.ttf")
+                "popx" -> Typeface.createFromAsset(assets, "fonts/Poppins-Bold.ttf")
+                "black" -> Typeface.create("sans-serif-black", Typeface.NORMAL)
+                "condb" -> Typeface.create("sans-serif-condensed", Typeface.BOLD)
+                "condl" -> Typeface.create("sans-serif-condensed-light", Typeface.NORMAL)
+                "casual" -> Typeface.create("casual", Typeface.NORMAL)
+                "hand" -> Typeface.create("cursive", Typeface.NORMAL)
+                "med" -> Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                "serifb" -> Typeface.create(Typeface.SERIF, Typeface.BOLD)
+                "mono" -> Typeface.MONOSPACE
                 "popb" -> Typeface.createFromAsset(assets, "fonts/Poppins-SemiBold.ttf")
                 "bebas" -> Typeface.createFromAsset(assets, "fonts/BebasNeue-Regular.ttf")
                 "audio" -> Typeface.createFromAsset(assets, "fonts/Audiowide-Regular.ttf")
@@ -182,6 +279,7 @@ class MainActivity : Activity() {
             addView(tTime); addView(tDate)
         }
         rootV.addView(clockBox, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or Gravity.END))
+        clockBox.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeDock() }
         cut = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; visibility = View.GONE }
         rootV.addView(cut, FrameLayout.LayoutParams(MATCH, MATCH))
         widgetBox = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -240,10 +338,16 @@ class MainActivity : Activity() {
     // ---------- clock / text style ----------
     private fun applyStyle() {
         val depth = s("cstyle", "normal") == "depth"
-        tTime.typeface = face(s("cfont", if (depth) "popb" else "pop")); tTime.setTextColor(clockCol())
-        tTime.glass = flag("glass")
+        val stack = depth && flag("cstack")
+        tTime.typeface = face(s("cfont", if (depth) "popx" else "pop")); tTime.setTextColor(clockCol())
+        tTime.glass = flag("glass"); tTime.gstyle = s("gstyle", "frost")
+        tTime.vs = if (depth) ((s("dstretch", "135").toFloatOrNull() ?: 135f) / 100f).coerceIn(1f, 2f) else 1f
         tTime.textSize = (if (depth) s("dsize", "200") else s("csize", "64")).toFloatOrNull() ?: 64f
-        tTime.format12Hour = if (flag("h24")) "HH:mm" else "h:mm"; tTime.format24Hour = "HH:mm"
+        val f12 = if (flag("h24")) (if (stack) "HH\nmm" else "HH:mm") else (if (stack) "h\nmm" else "h:mm")
+        tTime.format12Hour = f12; tTime.format24Hour = if (stack) "HH\nmm" else "HH:mm"
+        if (stack) { tTime.setLineSpacing(0f, 0.82f); tTime.gravity = Gravity.CENTER_HORIZONTAL }
+        else { tTime.setLineSpacing(0f, 1f); tTime.gravity = Gravity.START }
+        tTime.includeFontPadding = !depth
         tDate.typeface = face(s("tfont", "pop")); tDate.setTextColor(textCol())
         tDate.visibility = if (flag("showdate")) View.VISIBLE else View.GONE
         if (flag("glass")) tTime.setShadowLayer(0f, 0f, 0f, 0) else shadow(tTime)
@@ -253,8 +357,33 @@ class MainActivity : Activity() {
             "left" -> Gravity.START; "center" -> Gravity.CENTER_HORIZONTAL; else -> Gravity.END
         }
         clockBox.gravity = g
-        clockBox.layoutParams = FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or g).apply { if (depth) topMargin = dp(70) }
+        val pct = (s("cy", "6").toIntOrNull() ?: 6).coerceIn(0, 70)
+        val screenH = resources.displayMetrics.heightPixels
+        clockBox.layoutParams = FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or g).apply {
+            if (depth) topMargin = screenH * pct / 100
+        }
         tTime.invalidate()
+        rootV.post { placeDock() }
+    }
+
+    /** Keeps the dock out of the clock's way (no more clutter) when it is not a bottom row. */
+    private fun placeDock() {
+        if (!::dock.isInitialized) return
+        val lay = s("layout", "row")
+        val depth = s("cstyle", "normal") == "depth"
+        val rh = if (rootV.height > 0) rootV.height else resources.displayMetrics.heightPixels
+        val clockBottom = if (depth || s("cpos", "right") == "center") clockBox.bottom else 0
+        val lp = FrameLayout.LayoutParams(MATCH, WRAP, if (lay == "row") Gravity.BOTTOM else Gravity.CENTER_VERTICAL)
+        if (lay == "row") lp.bottomMargin = dp(16)
+        else { lp.topMargin = if (clockBottom > 0) clockBottom + dp(16) else 0; lp.bottomMargin = dp(24) }
+        val old = dock.layoutParams as? FrameLayout.LayoutParams
+        if (old == null || old.gravity != lp.gravity || old.topMargin != lp.topMargin || old.bottomMargin != lp.bottomMargin) dock.layoutParams = lp
+        if (lay == "grid") {
+            val sv = dock.getChildAt(dock.childCount - 1)
+            val room = rh - lp.topMargin - lp.bottomMargin - dp(40)
+            val hh = min(dp(340), max(dp(150), room))
+            if (sv != null && sv.layoutParams?.height != hh) sv.layoutParams = LinearLayout.LayoutParams(MATCH, hh)
+        }
     }
 
     // ---------- sound ----------
@@ -368,7 +497,30 @@ class MainActivity : Activity() {
         val key = f.lastModified().toString() + f.length()
         if (key == cutKey) return
         cutKey = key
-        bg.execute { val b = decode(f); runOnUiThread { cut.setImageBitmap(b) } }
+        bg.execute {
+            val b = decode(f)
+            val ok = b != null && hasHoles(b)
+            runOnUiThread {
+                if (ok) cut.setImageBitmap(b) else {
+                    cut.setImageDrawable(null)
+                    if (b != null) Toast.makeText(this, "Cutout has no transparent background, depth skipped so the clock stays visible", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    /** A real cutout has transparent areas; a fully opaque "cutout" would hide the clock completely. */
+    private fun hasHoles(b: Bitmap): Boolean {
+        if (!b.hasAlpha()) return false
+        var clear = 0; var n = 0
+        val sx = max(1, b.width / 48); val sy = max(1, b.height / 48)
+        var y = 0
+        while (y < b.height) {
+            var x = 0
+            while (x < b.width) { n++; if (Color.alpha(b.getPixel(x, y)) < 200) clear++; x += sx }
+            y += sy
+        }
+        return n > 0 && clear * 100 / n >= 3
     }
 
     // ---------- apps ----------
@@ -404,16 +556,20 @@ class MainActivity : Activity() {
         dock.removeAllViews(); tiles.clear(); rail = null
         val lay = s("layout", "row")
         val base = dp(s("tile", "170").toIntOrNull() ?: 170)
-        dock.layoutParams = FrameLayout.LayoutParams(MATCH, WRAP, if (lay == "row") Gravity.BOTTOM else Gravity.CENTER)
-            .apply { if (lay == "row") bottomMargin = dp(16) }
         selName.typeface = face(s("tfont", "pop")); selName.setTextColor(textCol()); shadow(selName); selName.text = ""
         if (flag("showlabel")) dock.addView(selName, LinearLayout.LayoutParams(MATCH, WRAP))
         if (upd > 0) tiles.add(pill(base, "Update v" + upd + "\nPress OK") { doUpdate() })
         for (a in list) tiles.add(tile(a, a.pkg in star, base))
         tiles.add(pill(base, "Customize") { showInfo() })
         if (lay == "grid") {
-            val gl = GridLayout(this).apply { columnCount = 6; for (v in tiles) addView(v) }
-            val sv = ScrollView(this).apply { isVerticalScrollBarEnabled = false; clipChildren = false; addView(gl) }
+            val cell = (base * 0.56f * 1.25f).toInt() + dp(28)
+            val cols = max(3, (resources.displayMetrics.widthPixels - dp(112)) / cell)
+            val gl = GridLayout(this).apply { columnCount = cols; for (v in tiles) addView(v) }
+            val sv = ScrollView(this).apply {
+                isVerticalScrollBarEnabled = false; clipChildren = false; clipToPadding = false
+                setPadding(0, dp(30), 0, dp(30))
+                addView(gl, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER_HORIZONTAL))
+            }
             dock.addView(sv, LinearLayout.LayoutParams(MATCH, dp(340)))
         } else {
             val rl = LinearLayout(this).apply {
@@ -424,6 +580,7 @@ class MainActivity : Activity() {
             rail = rv
             dock.addView(rv, LinearLayout.LayoutParams(MATCH, WRAP))
         }
+        placeDock()
         tiles.firstOrNull()?.requestFocus()
     }
 
@@ -660,7 +817,8 @@ class MainActivity : Activity() {
                     runOnUiThread { musicPos = 0; applyWall(); applyCut(); applyMusic() }
                     send("text/plain", "ok")
                 }
-                else -> send("text/html", PAGE.replace("@@F@@", FONTS.joinToString("") { "<option value=" + it.second + ">" + it.first + "</option>" }))
+                else -> send("text/html", PAGE.replace("@@F@@", FONTS.joinToString("") { "<option value=" + it.second + ">" + it.first + "</option>" })
+                    .replace("@@G@@", GLASS.joinToString("") { "<option value=" + it.second + ">" + it.first + "</option>" }))
             }
         }
     }
@@ -710,11 +868,15 @@ private const val PAGE = """<!doctype html><meta name=viewport content="width=de
 <h3>Clock</h3>
 <div class=r>Style<select id=cst><option value=normal>Normal</option><option value=depth>Depth (behind subject)</option></select></div>
 <div class=r>Glass clock<input type=checkbox id=gl></div>
+<div class=r>Glass look<select id=gs>@@G@@</select></div>
 <div class=r>Match wallpaper colors<input type=checkbox id=au></div>
 <div class=r>Clock font<select id=cf>@@F@@</select></div>
 <div class=r>Clock color<button class=sw data-k=cclr></button></div>
 <div class=r>Clock size<input type=range id=cs min=40 max=140></div>
-<div class=r>Depth clock size<input type=range id=ds min=120 max=320></div>
+<div class=r>Depth clock size<input type=range id=ds min=120 max=420></div>
+<div class=r>Depth tallness<input type=range id=dst min=100 max=190></div>
+<div class=r>Depth stacked (hours over minutes)<input type=checkbox id=stk></div>
+<div class=r>Depth clock height<input type=range id=cyy min=0 max=60></div>
 <div class=r>Position<select id=cp><option value=left>Left</option><option value=center>Center</option><option value=right>Right</option></select></div>
 <div class=r>24-hour<input type=checkbox id=h></div>
 <div class=r>Show date<input type=checkbox id=sd></div>
@@ -759,8 +921,8 @@ private const val PAGE = """<!doctype html><meta name=viewport content="width=de
 <div id=cw><canvas id=cv width=260 height=260></canvas><input type=range id=br min=15 max=100 value=100 style="width:260px"><div id=hx>#ffffff</div><div><button id=ok class=on>Apply</button> <button id=no>Cancel</button></div></div>
 <script>
 var g=function(i){return document.getElementById(i)},cur='#ffffff',tgt=null,R=130,lastWall=null;
-var M=[['cst','cstyle'],['cf','cfont'],['cs','csize'],['ds','dsize'],['cp','cpos'],['tf','tfont'],['wf','wfit'],['ly','layout'],['ts','tstyle'],['t','tile'],['tr','tradius'],['go','gop'],['v','vol'],['wc','wcity'],['nt','ntext'],['cn','cname'],['cd','cdate'],['tz','wtz']];
-var B=[['gl','glass'],['au','auto'],['h','h24'],['sd','showdate'],['sl','showlabel'],['s','sound'],['m','music']];
+var M=[['cst','cstyle'],['cf','cfont'],['cs','csize'],['ds','dsize'],['dst','dstretch'],['cyy','cy'],['gs','gstyle'],['cp','cpos'],['tf','tfont'],['wf','wfit'],['ly','layout'],['ts','tstyle'],['t','tile'],['tr','tradius'],['go','gop'],['v','vol'],['wc','wcity'],['nt','ntext'],['cn','cname'],['cd','cdate'],['tz','wtz']];
+var B=[['gl','glass'],['stk','cstack'],['au','auto'],['h','h24'],['sd','showdate'],['sl','showlabel'],['s','sound'],['m','music']];
 function set(q){return fetch('/set?'+q,{method:'POST'}).then(load)}
 function send(kind,type,blob){return fetch('/up?kind='+kind+'&type='+type,{method:'POST',body:blob})}
 function say(t){g('msg').innerHTML='<small>'+t+'</small>'}
