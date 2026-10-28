@@ -463,9 +463,9 @@ class MainActivity : Activity() {
         val rad = dp(s("tradius", "18").toIntOrNull() ?: 18).toFloat()
         return ImageView(this).apply {
             setImageDrawable(if (full) a.banner else a.icon)
-            scaleType = if (full) ImageView.ScaleType.CENTER_CROP else ImageView.ScaleType.FIT_CENTER
-            if (!full) { val pd = dp(if (iconStyle) 11 else 14); setPadding(pd, pd, pd, pd) }
-            background = glassBg()
+            scaleType = if (full || iconStyle) ImageView.ScaleType.CENTER_CROP else ImageView.ScaleType.FIT_CENTER
+            if (!full && !iconStyle) { val pd = dp(14); setPadding(pd, pd, pd, pd) }
+            if (!iconStyle) background = glassBg()
             clipToOutline = true
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(v: View, o: Outline) { o.setRoundRect(0, 0, v.width, v.height, rad) }
