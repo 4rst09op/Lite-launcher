@@ -17,9 +17,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.7
-      - run: gradle assembleDebug --no-daemon
+      - run: gradle assembleDebug -Pvc=${{ github.run_number }} --no-daemon
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Latest build
+          body: "${{ github.run_number }}"
           files: app/build/outputs/apk/debug/app-debug.apk
